@@ -6,7 +6,6 @@ async function start() {
   const PORT = process.env.PORT || 5000;
   const app = await NestFactory.create(AppModule);
   const config = new DocumentBuilder()
-
     .setTitle('Passport')
     .setDescription('Документация passport')
     .setVersion('1.0.0')

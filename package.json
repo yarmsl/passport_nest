@@ -1,7 +1,7 @@
 {
   "name": "passport_nest",
   "version": "0.0.1",
-  "description": "auth passport service",
+  "description": "oauth passport service",
   "author": "yarmsl",
   "private": true,
   "license": "UNLICENSED",

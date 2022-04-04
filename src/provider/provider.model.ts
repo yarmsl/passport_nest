@@ -28,7 +28,7 @@ export class Provider extends Model<Provider, IProvider> {
     description: 'Токен',
   })
   @Column({
-    type: DataType.STRING,
+    type: DataType.STRING(2000),
     allowNull: false,
   })
   token: string;

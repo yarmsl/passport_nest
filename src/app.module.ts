@@ -5,7 +5,7 @@ import { User } from './users/users.model';
 import { UsersModule } from './users/users.module';
 import { ProviderModule } from './provider/provider.module';
 import { Provider } from './provider/provider.model';
-
+import { AuthModule } from './auth/auth.module';
 @Module({
   controllers: [],
   providers: [],
@@ -25,6 +25,7 @@ import { Provider } from './provider/provider.model';
     }),
     UsersModule,
     ProviderModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

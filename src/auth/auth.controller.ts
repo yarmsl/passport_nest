@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UsePipes } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, UsePipes } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateUserDto } from 'src/users/dto/createUser.dto';
 import { AuthService } from './auth.service';
@@ -23,5 +23,21 @@ export class AuthController {
   @Post('email/signin')
   signin(@Body() signinDto: AuthUserDto) {
     return this.authService.signin(signinDto);
+  }
+
+  @ApiOperation({ summary: 'Проверка авторизации' })
+  @ApiResponse({ status: 200, type: '123' })
+  @UsePipes(ValidationPipe)
+  @Get('check')
+  check(@Headers('authorization') authHeader: string) {
+    return this.authService.check(authHeader);
+  }
+
+  @ApiOperation({ summary: 'Обновление токена' })
+  @ApiResponse({ status: 200, type: '123' })
+  @UsePipes(ValidationPipe)
+  @Get('refresh')
+  refresh(@Headers('authorization') authHeader: string) {
+    return this.authService.refresh(authHeader);
   }
 }

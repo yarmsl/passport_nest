@@ -1,0 +1,1 @@
+type tokenType = 'access' | 'refresh';

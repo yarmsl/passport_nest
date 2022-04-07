@@ -1,7 +1,13 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { compare, hash } from 'bcryptjs';
 import { AuthUserDto } from 'src/auth/dto/authUser.dto';
+import { apiPostWithToken } from 'src/configuration/fetch.conf';
 import { CreateUserDto } from './dto/createUser.dto';
 import { User } from './users.model';
 
@@ -17,8 +23,12 @@ export class UsersService {
     return await this.userRepository.findOne({ where: { email } });
   }
 
+  async hashPassword(pass: string) {
+    return await hash(pass, 10);
+  }
+
   async hashedPassDto(dto: CreateUserDto): Promise<CreateUserDto> {
-    const hashedPass = await hash(dto.password, 10);
+    const hashedPass = await this.hashPassword(dto.password);
     return { ...dto, password: hashedPass };
   }
 
@@ -36,5 +46,16 @@ export class UsersService {
     throw new UnauthorizedException({
       message: 'Некоректный email или пароль',
     });
+  }
+
+  async signupOnDataServer(access_token: string) {
+    try {
+      await apiPostWithToken(process.env.SIGNUP_LINK, {}, access_token);
+    } catch (e) {
+      throw new HttpException(
+        'Ошибка регистрации пользователя на втором инстансе',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

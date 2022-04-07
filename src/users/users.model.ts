@@ -80,7 +80,7 @@ export class User extends Model<User, IUser> {
   })
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: true,
   })
   phone: string;
 

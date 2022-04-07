@@ -6,6 +6,10 @@ import { UsersModule } from './users/users.module';
 import { ProviderModule } from './provider/provider.module';
 import { Provider } from './provider/provider.model';
 import { AuthModule } from './auth/auth.module';
+import { GoogleAuthModule } from './google-auth/google-auth.module';
+import { MailModule } from './mail/mail.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { resolve } from 'path';
 @Module({
   controllers: [],
   providers: [],
@@ -13,6 +17,9 @@ import { AuthModule } from './auth/auth.module';
     ConfigModule.forRoot({
       envFilePath: `.env.${process.env.NODE_ENV}`,
       isGlobal: true,
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: resolve(__dirname, 'assets'),
     }),
     SequelizeModule.forRoot({
       dialect: 'postgres',
@@ -27,6 +34,8 @@ import { AuthModule } from './auth/auth.module';
     UsersModule,
     ProviderModule,
     AuthModule,
+    GoogleAuthModule,
+    MailModule,
   ],
 })
 export class AppModule {}

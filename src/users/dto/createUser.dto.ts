@@ -36,6 +36,11 @@ export class CreateUserDto implements IUser {
     example: '+79993322456',
     description: 'Номер телефона',
   })
-  @IsString({ message: 'Должно быть строкой' })
-  readonly phone: string;
+  readonly phone?: string;
+
+  @ApiProperty({
+    example: '/avatar.jpg',
+    description: 'Путь к фотке',
+  })
+  readonly photo?: string;
 }

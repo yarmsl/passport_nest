@@ -5,12 +5,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { apiPostWithToken } from 'src/configuration/fetch.conf';
+import { MailService } from 'src/mail/mail.service';
 import { ProviderService } from 'src/provider/provider.service';
 import { CreateUserDto } from 'src/users/dto/createUser.dto';
 import { User } from 'src/users/users.model';
 import { UsersService } from 'src/users/users.service';
-import { AuthUserDto } from './dto/authUser.dto';
+import {
+  AuthUserDto,
+  ChangePassDto,
+  RecoveryPassDto,
+} from './dto/authUser.dto';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +22,7 @@ export class AuthService {
     private userService: UsersService,
     private providerService: ProviderService,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
   async signup(signupDto: CreateUserDto) {
@@ -40,7 +45,7 @@ export class AuthService {
       token: refresh_token,
       account_type: 'email',
     });
-    // await this.signupOnDataServer(access_token);
+    // await this.userService.signupOnDataServer(access_token);
     return {
       access_token,
       refresh_token,
@@ -54,16 +59,11 @@ export class AuthService {
 
   async check(authHeader: string) {
     try {
-      const { access_token } = await this.validateToken(authHeader, 'refresh');
-      const userData = this.jwtService.decode(access_token);
-      if (typeof userData !== 'string' && 'email' in userData) {
-        const user = await this.userService.getUserByEmail(userData.email);
-        return await this.generateTokens(user, 'email');
-      } else {
-        throw new UnauthorizedException({
-          message: 'Пользователь не авторизован',
-        });
-      }
+      const token = this.bearerToken(authHeader);
+      const { access_token } = await this.validateToken(token, 'refresh');
+      const email = this.getEmailFromAccessToken(access_token);
+      const user = await this.userService.getUserByEmail(email);
+      return await this.generateTokens(user, 'email');
     } catch (e) {
       throw new UnauthorizedException({
         message: 'Пользователь не авторизован',
@@ -73,7 +73,8 @@ export class AuthService {
 
   async refresh(authHeader: string) {
     try {
-      const { email } = await this.validateToken(authHeader, 'access');
+      const token = this.bearerToken(authHeader);
+      const email = this.getEmailFromAccessToken(token);
       const user = await this.userService.getUserByEmail(email);
       const access_token = await this.generateAccessToken(user, 'email');
       return { access_token };
@@ -84,7 +85,64 @@ export class AuthService {
     }
   }
 
-  private async generateAccessToken(user: User, account_type: string) {
+  async recoveryPass(recoveryPassDto: RecoveryPassDto) {
+    const user = await this.userService.getUserByEmail(recoveryPassDto.email);
+    if (!user) {
+      throw new HttpException('Пользователь не найден', HttpStatus.NOT_FOUND);
+    }
+    const access_token = await this.generateAccessToken(user, 'email');
+    try {
+      await this.mailService.sendRecoveryPassMail(user, access_token);
+      return { message: 'Проверьте вашу почту' };
+    } catch (e) {
+      throw new HttpException(
+        'Ошибка отправки email',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async redirectToPassChange(access_token: string) {
+    try {
+      const { email } = await this.validateToken(access_token, 'access');
+      const user = await this.userService.getUserByEmail(email);
+      const token = await this.generateAccessToken(user, 'email');
+      return {
+        url: `${process.env.FRONT_URI}/new_password/${token}`,
+        statusCode: 302,
+      };
+    } catch (e) {
+      throw new UnauthorizedException({
+        message: 'Время действия запроса истекло',
+      });
+    }
+  }
+
+  async changePassword(passDto: ChangePassDto, access_token: string) {
+    try {
+      const token = this.bearerToken(access_token);
+      const { email } = await this.validateToken(token, 'access');
+      const user = await this.userService.getUserByEmail(email);
+      user.password = await this.userService.hashPassword(passDto.password);
+      await user.save();
+      return await this.generateTokens(user, 'email');
+    } catch (e) {
+      throw new UnauthorizedException({
+        message: 'Время действия запроса истекло',
+      });
+    }
+  }
+
+  async generateTokens(user: User, account_type: string) {
+    const access_token = await this.generateAccessToken(user, account_type);
+    const refresh_token = await this.generateRefreshToken(access_token);
+    return {
+      access_token,
+      refresh_token,
+    };
+  }
+
+  async generateAccessToken(user: User, account_type: string) {
     try {
       const { id, first_name, last_name, photo, email, phone } = user;
       return await this.jwtService.signAsync(
@@ -127,29 +185,8 @@ export class AuthService {
     }
   }
 
-  private async generateTokens(user: User, account_type: string) {
-    const access_token = await this.generateAccessToken(user, account_type);
-    const refresh_token = await this.generateRefreshToken(access_token);
-    return {
-      access_token,
-      refresh_token,
-    };
-  }
-
-  private async signupOnDataServer(access_token: string) {
+  private async validateToken(token: string, tokenType: tokenType) {
     try {
-      await apiPostWithToken(process.env.SIGNUP_LINK, {}, access_token);
-    } catch (e) {
-      throw new HttpException(
-        'Ошибка регистрации пользователя на втором инстансе',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  private async validateToken(authHeader: string, tokenType: tokenType) {
-    try {
-      const token = this.bearerToken(authHeader);
       const verified = await this.jwtService.verifyAsync(token, {
         secret:
           tokenType === 'access'
@@ -173,5 +210,16 @@ export class AuthService {
       });
     }
     return token;
+  }
+
+  private getEmailFromAccessToken(access_token: string): string {
+    const userData = this.jwtService.decode(access_token);
+    if (typeof userData !== 'string' && 'email' in userData) {
+      return userData.email;
+    } else {
+      throw new UnauthorizedException({
+        message: 'Пользователь не авторизован',
+      });
+    }
   }
 }

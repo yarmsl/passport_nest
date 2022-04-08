@@ -45,7 +45,6 @@ export class GoogleAuthService extends PassportStrategy(Strategy, 'google') {
     }
     try {
       const user = await this.googleUser(req.user);
-      console.log(user);
       const { access_token, refresh_token } =
         await this.authService.generateTokens(user, 'google');
       return {
